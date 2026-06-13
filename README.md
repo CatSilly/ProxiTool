@@ -2,6 +2,8 @@
 
 A free, open-source tool for image format conversion, resizing, and compression without quality loss.
 
+[Open ProxiTool](https://catsilly.github.io/ProxiTool/)
+
 ## Features
 
 - **Format Conversion** - Convert between popular image formats
@@ -16,3 +18,6 @@ A free, open-source tool for image format conversion, resizing, and compression 
 - No Ads
 - No Premium Plans
 - No Registration Required
+
+## License
+This project uses an MIT license, please refer to [LICENSE](LICENSE) file.
