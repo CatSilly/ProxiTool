@@ -3,16 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Proximagic Tool v1.0.0</title>
+    <title>ProxiTool v1.1.0</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>Proximagic Tool</h1>
+            <h1>ProxiTool</h1>
             <p>Simple media converter without premium nonsense</p>
-            <span class="version">v1.0.0</span>
+            <span class="version">v1.1.0</span>
         </div>
 
         <!-- Mode Selector -->
@@ -25,14 +25,13 @@
                 </svg>
                 Image Converter
             </button>
-            <button id="audioMode" class="mode-btn mode-coming-soon">
+            <button id="audioMode" class="mode-btn">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M9 18V5l12-2v13"></path>
                     <circle cx="6" cy="18" r="3"></circle>
                     <circle cx="18" cy="16" r="3"></circle>
                 </svg>
                 Audio Converter
-                <span class="coming-soon-badge">Soon</span>
             </button>
             <button id="magicMode" class="mode-btn">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -97,15 +96,70 @@
                 </div>
 
                 <div id="audioSettings" class="hidden">
-                    <div class="coming-soon-message">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="12" y1="8" x2="12" y2="12"></line>
-                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                        </svg>
-                        <h3>Coming Soon in v1.1.0</h3>
-                        <p>Audio conversion feature will be available in the next update</p>
+                    <div class="form-group">
+                        <label>Output Format</label>
+                        <select id="audioFormat">
+                            <option value="mp3">MP3</option>
+                            <option value="wav">WAV</option>
+                        </select>
                     </div>
+
+                    <div class="form-group">
+                        <label>Sample Rate</label>
+                        <select id="audioSampleRate">
+                            <option value="original">Original</option>
+                            <option value="44100">44100 Hz</option>
+                            <option value="48000">48000 Hz</option>
+                            <option value="22050">22050 Hz</option>
+                            <option value="16000">16000 Hz (voice)</option>
+                            <option value="8000">8000 Hz (low)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Channels</label>
+                        <select id="audioChannels">
+                            <option value="original">Original</option>
+                            <option value="2">Stereo</option>
+                            <option value="1">Mono</option>
+                        </select>
+                    </div>
+
+                    <div id="audioBitrateGroup" class="form-group">
+                        <label>Bitrate</label>
+                        <select id="audioBitrate">
+                            <option value="320">320 kbps</option>
+                            <option value="256">256 kbps</option>
+                            <option value="192" selected>192 kbps</option>
+                            <option value="128">128 kbps</option>
+                            <option value="96">96 kbps</option>
+                            <option value="64">64 kbps</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Volume</label>
+                        <div class="range-row">
+                            <input type="range" id="audioVolume" min="0" max="200" value="100" step="5">
+                            <span class="range-value" id="audioVolumeValue">100%</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="audioNormalize">
+                            Normalize Volume
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="audioTrimSilence">
+                            Trim Silence (start/end)
+                        </label>
+                    </div>
+
+                    <p class="note">Conversion runs entirely in your browser via the Web Audio API. Large files or long audio may take a moment.</p>
                 </div>
 
                 <div id="magicSettings" class="hidden">
@@ -254,7 +308,9 @@
     </div>
 </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
     <script src="helper.js"></script>
+    <script src="audio.js"></script>
     <script src="magic.js"></script>
     <script src="spritesheet.js"></script>
     <script src="convert.js"></script>

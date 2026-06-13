@@ -1,12 +1,11 @@
 let convertedFiles = [];
 let currentMode = 'image';
-let ffmpeg = null;
-let ffmpegLoaded = false;
 
 const fileManager = new FileManager();
 
 const magicCompressor = new MagicImageCompressor();
 const spritesheetGenerator = new SpritesheetGenerator();
+const audioConverter = new AudioConverter();
 
 const imageMode = document.getElementById('imageMode');
 const audioMode = document.getElementById('audioMode');
@@ -68,57 +67,32 @@ downloadAll.addEventListener('click', downloadAllFiles);
 resetBtn.addEventListener('click', reset);
 resizeOption.addEventListener('change', toggleCustomSize);
 
+const audioFormatSelect = document.getElementById('audioFormat');
+const audioBitrateGroup = document.getElementById('audioBitrateGroup');
+const audioVolume = document.getElementById('audioVolume');
+const audioVolumeValue = document.getElementById('audioVolumeValue');
+
+if (audioFormatSelect) {
+    audioFormatSelect.addEventListener('change', () => {
+        if (audioFormatSelect.value === 'wav') {
+            UIHelper.hide(audioBitrateGroup);
+        } else {
+            UIHelper.show(audioBitrateGroup);
+        }
+    });
+}
+
+if (audioVolume) {
+    audioVolume.addEventListener('input', () => {
+        audioVolumeValue.textContent = audioVolume.value + '%';
+    });
+}
+
 fileManager.onChange((files) => {
     updateFileList(files);
 });
 
-async function loadFFmpeg() {
-    if (ffmpegLoaded) return true;
-    
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-        NotificationHelper.error('Audio conversion is not supported on mobile devices. Please use desktop browser.');
-        return false;
-    }
-    
-    if (typeof SharedArrayBuffer === 'undefined') {
-        NotificationHelper.error('Your browser does not support audio conversion. Try Chrome/Firefox on desktop.');
-        return false;
-    }
-    
-    try {
-        if (typeof FFmpeg === 'undefined') {
-            throw new Error('FFmpeg library not loaded');
-        }
-        
-        ffmpeg = new FFmpeg.FFmpeg();
-        
-        ffmpeg.on('log', ({ message }) => {
-            console.log(message);
-        });
-        
-        await ffmpeg.load({
-            coreURL: 'libs/ffmpeg-core.js',
-            wasmURL: 'libs/ffmpeg-core.wasm'
-        });
-        
-        ffmpegLoaded = true;
-        NotificationHelper.success('Audio converter loaded successfully');
-        return true;
-    } catch (error) {
-        console.error('Failed to load FFmpeg:', error);
-        NotificationHelper.error('Failed to load audio converter. Please check your browser compatibility.');
-        return false;
-    }
-}
-
 function switchMode(mode) {
-    if (mode === 'audio') {
-        NotificationHelper.info('Audio Converter is coming soon in v1.1.0!');
-        return;
-    }
-    
     currentMode = mode;
     
     // Remove all active classes
@@ -148,6 +122,11 @@ function switchMode(mode) {
         UIHelper.show(spritesheetSettings);
         uploadHandler.setAccept('image/*');
         UIHelper.setText(fileType, 'images for spritesheet');
+    } else if (mode === 'audio') {
+        UIHelper.addClass(audioMode, 'active');
+        UIHelper.show(audioSettings);
+        uploadHandler.setAccept('audio/*');
+        UIHelper.setText(fileType, 'audio files');
     }
     
     fileManager.clearAll();
@@ -229,11 +208,6 @@ async function handleConvert() {
     const files = fileManager.getAll();
     if (files.length === 0) return;
     
-    if (currentMode === 'audio') {
-        NotificationHelper.error('Audio Converter is coming soon in v1.1.0!');
-        return;
-    }
-    
     if (currentMode === 'spritesheet') {
         if (files.length < 2) {
             NotificationHelper.error('Please select at least 2 images for spritesheet');
@@ -278,10 +252,33 @@ async function handleConvert() {
                 const resize = resizeOption.value;
                 blob = await convertImage(fileData.file, format, resize);
                 outputFormat = format;
+            } else if (currentMode === 'audio') {
+                const audioFormat = document.getElementById('audioFormat').value;
+                const sampleRate = document.getElementById('audioSampleRate').value;
+                const channels = document.getElementById('audioChannels').value;
+                const bitrate = document.getElementById('audioBitrate').value;
+                const volumePct = parseInt(document.getElementById('audioVolume').value) || 100;
+                const normalize = document.getElementById('audioNormalize').checked;
+                const trim = document.getElementById('audioTrimSilence').checked;
+
+                const result = await audioConverter.convert(fileData.file, {
+                    format: audioFormat,
+                    sampleRate: sampleRate,
+                    channels: channels,
+                    bitrate: bitrate,
+                    volume: volumePct / 100,
+                    normalize: normalize,
+                    trim: trim
+                });
+
+                blob = result.blob;
+                info = result.info;
+                outputFormat = audioFormat;
             }
             
             const originalName = fileData.name.substring(0, fileData.name.lastIndexOf('.'));
-            const newFileName = `${originalName}_${currentMode === 'magic' ? 'magic' : 'converted'}.${outputFormat}`;
+            const suffix = currentMode === 'magic' ? 'magic' : currentMode === 'audio' ? 'audio' : 'converted';
+            const newFileName = `${originalName}_${suffix}.${outputFormat}`;
             
             convertedFiles.push({
                 id: fileData.id,
@@ -470,10 +467,17 @@ function showConvertedFiles() {
             extraInfo = `<div class="spritesheet-info">
                 <small>📄 Metadata JSON file for game engines</small>
             </div>`;
+        } else if (file.info && currentMode === 'audio') {
+            const o = file.info.original;
+            const out = file.info.output;
+            extraInfo = `<div class="audio-info">
+                <small>🎵 ${o.sampleRate}Hz/${o.channels}ch → ${out.sampleRate}Hz/${out.channels}ch · ${out.format.toUpperCase()}</small>
+                <small>⏱ ${out.duration.toFixed(1)}s</small>
+            </div>`;
         }
         
         return `
-            <div class="converted-item ${currentMode === 'magic' ? 'magic-item' : currentMode === 'spritesheet' ? 'spritesheet-item' : ''}">
+            <div class="converted-item ${currentMode === 'magic' ? 'magic-item' : currentMode === 'spritesheet' ? 'spritesheet-item' : currentMode === 'audio' ? 'audio-item' : ''}">
                 <div class="converted-info">
                     <div class="file-name">${file.name}</div>
                     <div class="file-size">${file.size}</div>
