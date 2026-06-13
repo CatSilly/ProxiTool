@@ -1,4 +1,4 @@
-# Proximagic Studio
+# ProxiTool
 
 A free, open-source tool for image format conversion, resizing, and compression without quality loss.
 
@@ -16,6 +16,3 @@ A free, open-source tool for image format conversion, resizing, and compression 
 - No Ads
 - No Premium Plans
 - No Registration Required
-
-## Link to use this tool
-Link: [Click Here!](https://kanotazon22.github.io/Proximagic-Tool/)
