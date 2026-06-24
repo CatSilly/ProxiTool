@@ -9,7 +9,7 @@ A free, open-source tool for image format conversion, resizing, and compression 
 - **Format Conversion** - Convert between popular image formats
 - **Resize Images** - Adjust dimensions easily
 - **Compress Files** - Reduce file size without losing quality
-- **Audio Support** - Coming soon
+- **Audio Support** - Change audio media
 
 ## Why Choose This?
 
