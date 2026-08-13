@@ -2,7 +2,7 @@
 
 A free, open-source tool for converting, resizing, and compressing images with control over quality and file size.
 
-[Open Proxitool]()
+[Open Proxitool](catsilly.github.io/ProxiTool/)
 
 ## Featured
 
