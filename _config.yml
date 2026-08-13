@@ -1,0 +1,11 @@
+title: ProxiTool
+description: Universal converter focus on privacy
+baseurl: ""
+url: "https://catsilly.github.io"
+
+exclude:
+  - README.md
+  - Gemfile
+  - Gemfile.lock
+  - preview/
+  - test/
