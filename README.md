@@ -10,6 +10,7 @@ A free, open-source tool for converting, resizing, and compressing images with c
 - **Image Resizing**: Resize images to your desired dimensions.
 - **Image Compression**: Reduce file size while preserving visual quality.
 - **Audio Conversion**: Convert audio files between supported formats.
+- **Spritesheet Generator**: Make spritesheet from your images.
 - **Local Processing**: Process your files directly on your device.
 
 ## Privacy First
