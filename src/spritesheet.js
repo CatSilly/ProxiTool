@@ -1,4 +1,18 @@
+/**
+ * Packs a set of images into a single spritesheet canvas, using a uniform
+ * cell size sized to the largest input image. Supports horizontal, vertical,
+ * square/auto grid layouts, and can export TexturePacker-style JSON metadata.
+ */
 class SpritesheetGenerator {
+    /**
+     * @param {object} [options]
+     * @param {'horizontal'|'vertical'|'square'|'auto'} [options.layout='auto'] - Grid arrangement.
+     * @param {number} [options.padding=0] - Pixels of padding around and between cells.
+     * @param {string} [options.backgroundColor='transparent'] - Fill color, or 'transparent' for none.
+     * @param {number} [options.maxSize=4096] - Max canvas width/height in pixels; generate() throws if exceeded.
+     * @param {number|null} [options.columns=null] - Force a specific column count (square/auto layout only).
+     * @param {number|null} [options.rows=null] - Force a specific row count (square/auto layout only, used if columns isn't set).
+     */
     constructor(options = {}) {
         this.options = {
             layout: options.layout || 'auto', // 'horizontal', 'vertical', 'square', 'auto'
@@ -10,25 +24,31 @@ class SpritesheetGenerator {
         };
     }
 
+    /**
+     * Load the given files, lay them out in a grid, and render the spritesheet.
+     * @param {File[]} files - Image files to pack. Files that fail to load are skipped.
+     * @returns {Promise<{blob: Blob, canvas: HTMLCanvasElement, layout: object, preview: object, info: object}>}
+     * @throws {Error} If no images loaded successfully, or the resulting canvas exceeds options.maxSize.
+     */
     async generate(files) {
         try {
-            // Load tất cả images
+            // Load all images
             const images = await this.loadImages(files);
             
             if (images.length === 0) {
                 throw new Error('No valid images to process');
             }
 
-            // Tính toán layout
+            // Calculate layout
             const layout = this.calculateLayout(images);
             
-            // Tạo canvas và vẽ spritesheet
+            // Create canvas and draw spritesheet
             const canvas = this.createSpritesheet(images, layout);
             
             // Convert sang blob
             const blob = await this.canvasToBlob(canvas);
             
-            // Tạo preview data
+            // Build preview data
             const previewData = this.generatePreviewData(images, layout);
             
             return {
@@ -52,6 +72,11 @@ class SpritesheetGenerator {
         }
     }
 
+    /**
+     * Load every file into an image record, silently dropping any that fail to load.
+     * @param {File[]} files
+     * @returns {Promise<object[]>} Loaded image records ({image, width, height, name, file}).
+     */
     async loadImages(files) {
         const promises = files.map(file => this.loadImage(file));
         const results = await Promise.allSettled(promises);
@@ -61,6 +86,11 @@ class SpritesheetGenerator {
             .map(result => result.value);
     }
 
+    /**
+     * Load a single file into an HTMLImageElement and wrap it with its metadata.
+     * @param {File} file
+     * @returns {Promise<{image: HTMLImageElement, width: number, height: number, name: string, file: File}>}
+     */
     loadImage(file) {
         return new Promise((resolve, reject) => {
             const img = new Image();
@@ -82,6 +112,13 @@ class SpritesheetGenerator {
         });
     }
 
+    /**
+     * Compute the grid dimensions, uniform cell size, and per-sprite positions
+     * for the given images, based on options.layout/columns/rows/padding.
+     * @param {object[]} images - Loaded image records from loadImages().
+     * @returns {object} Layout info: columns, rows, cellWidth, cellHeight, canvasWidth, canvasHeight, padding, positions.
+     * @throws {Error} If the resulting canvas would exceed options.maxSize.
+     */
     calculateLayout(images) {
         const layout = this.options.layout;
         const padding = this.options.padding;
@@ -90,7 +127,7 @@ class SpritesheetGenerator {
         let cellWidth = 0;
         let cellHeight = 0;
 
-        // Tìm kích thước lớn nhất
+        // Find the largest dimension
         images.forEach(img => {
             cellWidth = Math.max(cellWidth, img.width);
             cellHeight = Math.max(cellHeight, img.height);
@@ -103,7 +140,7 @@ class SpritesheetGenerator {
             columns = 1;
             rows = images.length;
         } else if (layout === 'square' || layout === 'auto') {
-            // Tính số cột/hàng để tạo hình vuông gần nhất
+            // Calculate columns/rows to form the closest square
             if (this.options.columns) {
                 columns = this.options.columns;
                 rows = Math.ceil(images.length / columns);
@@ -119,7 +156,7 @@ class SpritesheetGenerator {
         const canvasWidth = (cellWidth * columns) + (padding * (columns + 1));
         const canvasHeight = (cellHeight * rows) + (padding * (rows + 1));
 
-        // Kiểm tra giới hạn kích thước
+        // Check size limit
         if (canvasWidth > this.options.maxSize || canvasHeight > this.options.maxSize) {
             throw new Error(`Spritesheet too large: ${canvasWidth}x${canvasHeight}. Max size: ${this.options.maxSize}`);
         }
@@ -136,6 +173,16 @@ class SpritesheetGenerator {
         };
     }
 
+    /**
+     * Compute the top-left (x, y) position of each cell in row-major order.
+     * @param {number} count - Number of sprites to place.
+     * @param {number} columns
+     * @param {number} rows
+     * @param {number} cellWidth
+     * @param {number} cellHeight
+     * @param {number} padding
+     * @returns {{x: number, y: number, width: number, height: number, index: number}[]}
+     */
     calculatePositions(count, columns, rows, cellWidth, cellHeight, padding) {
         const positions = [];
         
@@ -155,6 +202,13 @@ class SpritesheetGenerator {
         return positions;
     }
 
+    /**
+     * Render all images onto a single canvas at the positions computed by calculateLayout(),
+     * centering each image within its cell if it's smaller than the cell.
+     * @param {object[]} images - Loaded image records.
+     * @param {object} layout - Layout info from calculateLayout().
+     * @returns {HTMLCanvasElement}
+     */
     createSpritesheet(images, layout) {
         const canvas = document.createElement('canvas');
         canvas.width = layout.canvasWidth;
@@ -165,17 +219,17 @@ class SpritesheetGenerator {
             willReadFrequently: false
         });
 
-        // Vẽ background
+        // Draw background
         if (this.options.backgroundColor !== 'transparent') {
             ctx.fillStyle = this.options.backgroundColor;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
-        // Vẽ từng image vào vị trí tương ứng
+        // Draw each image into its corresponding cell
         images.forEach((img, index) => {
             const pos = layout.positions[index];
             
-            // Căn giữa image trong cell nếu image nhỏ hơn cell
+            // Center image within the cell if smaller than the cell
             const offsetX = (layout.cellWidth - img.width) / 2;
             const offsetY = (layout.cellHeight - img.height) / 2;
             
@@ -191,6 +245,13 @@ class SpritesheetGenerator {
         return canvas;
     }
 
+    /**
+     * Build a lightweight summary of the spritesheet (per-image name/position/size, grid info)
+     * for use in UI previews.
+     * @param {object[]} images - Loaded image records.
+     * @param {object} layout - Layout info from calculateLayout().
+     * @returns {object}
+     */
     generatePreviewData(images, layout) {
         return {
             images: images.map((img, index) => ({
@@ -210,6 +271,13 @@ class SpritesheetGenerator {
         };
     }
 
+    /**
+     * Convert the spritesheet canvas to a Blob.
+     * @param {HTMLCanvasElement} canvas
+     * @param {string} [format='image/png']
+     * @param {number} [quality=1.0] - Only applies to lossy formats.
+     * @returns {Promise<Blob>}
+     */
     canvasToBlob(canvas, format = 'image/png', quality = 1.0) {
         return new Promise((resolve, reject) => {
             canvas.toBlob(
@@ -226,7 +294,14 @@ class SpritesheetGenerator {
         });
     }
 
-    // Generate JSON metadata cho spritesheet
+    /**
+     * Build TexturePacker-style JSON metadata (frames + meta) describing where
+     * each sprite lives within the spritesheet, for use by game engines.
+     * @param {{name: string, width: number, height: number}[]} images
+     * @param {object} layout - Layout info from calculateLayout() (positions, canvasWidth/Height).
+     * @param {string} [spritesheetName='spritesheet.png'] - Filename referenced in the metadata.
+     * @returns {object}
+     */
     generateMetadata(images, layout, spritesheetName = 'spritesheet.png') {
         const frames = {};
         
@@ -274,7 +349,13 @@ class SpritesheetGenerator {
         };
     }
 
-    // Export metadata as JSON file
+    /**
+     * Generate the metadata JSON and package it as a downloadable Blob.
+     * @param {{name: string, width: number, height: number}[]} images
+     * @param {object} layout - Layout info from calculateLayout().
+     * @param {string} spritesheetName - Filename referenced in the metadata.
+     * @returns {Blob}
+     */
     exportMetadata(images, layout, spritesheetName) {
         const metadata = this.generateMetadata(images, layout, spritesheetName);
         const json = JSON.stringify(metadata, null, 2);

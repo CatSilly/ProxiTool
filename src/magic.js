@@ -1,4 +1,20 @@
+/**
+ * Compresses an image to a target file size (KB) using a binary search over
+ * JPEG/WebP quality, falling back to progressive downscaling if quality
+ * search alone isn't enough. Never returns a result larger than the original.
+ */
 class MagicImageCompressor {
+    /**
+     * @param {object} [options]
+     * @param {number} [options.targetSizeKB=50] - Desired output size in kilobytes.
+     * @param {number} [options.maxWidth=4096] - Upper bound on output width.
+     * @param {number} [options.maxHeight=4096] - Upper bound on output height.
+     * @param {boolean} [options.maintainAspectRatio=true] - Currently informational; dimension math always preserves ratio.
+     * @param {number} [options.minQuality=0.1] - Lower bound for the quality binary search.
+     * @param {number} [options.maxQuality=0.92] - Upper bound for the quality binary search.
+     * @param {number} [options.stepQuality=0.05] - Reserved for future step-based search; not used by the binary search.
+     * @param {'auto'|string} [options.format='auto'] - 'auto' picks JPEG; otherwise pass a MIME type like 'image/webp'.
+     */
     constructor(options = {}) {
         this.options = {
             targetSizeKB: options.targetSizeKB || 50,
@@ -12,12 +28,19 @@ class MagicImageCompressor {
         };
     }
 
+    /**
+     * Compress a single image file down to (approximately) options.targetSizeKB.
+     * Skips compression if the file is already under the target, and falls
+     * back to the original file if compression would make it larger.
+     * @param {File} file - Source image file.
+     * @returns {Promise<{blob: Blob, info: object}>} The resulting blob and stats about the compression.
+     */
     async compress(file) {
         try {
             const img = await this.loadImage(file);
             const originalSize = file.size / 1024;
 
-            // KIỂM TRA: Nếu file gốc đã nhỏ hơn target, GIỮ NGUYÊN
+            // CHECK: if original file is already smaller than target, KEEP AS IS
             if (originalSize <= this.options.targetSizeKB) {
                 return {
                     blob: file,
@@ -50,12 +73,12 @@ class MagicImageCompressor {
 
             let finalResult = result;
             
-            // Nếu vẫn lớn hơn target, thử nén mạnh hơn
+            // If still larger than target, try more aggressive compression
             if (result.blob.size / 1024 > this.options.targetSizeKB) {
                 finalResult = await this.advancedCompress(img, format);
             }
 
-            // QUAN TRỌNG: Nếu file nén lớn hơn file gốc, TRẢ VỀ FILE GỐC
+            // IMPORTANT: if compressed file is larger than original, RETURN THE ORIGINAL FILE
             if (finalResult.blob.size > file.size) {
                 return {
                     blob: file,
@@ -89,6 +112,11 @@ class MagicImageCompressor {
         }
     }
 
+    /**
+     * Load a File into an HTMLImageElement, revoking the temporary object URL once loaded/failed.
+     * @param {File} file
+     * @returns {Promise<HTMLImageElement>}
+     */
     loadImage(file) {
         return new Promise((resolve, reject) => {
             const img = new Image();
@@ -104,12 +132,18 @@ class MagicImageCompressor {
         });
     }
 
+    /**
+     * Pick the output MIME type to encode to. Currently always resolves to
+     * JPEG when options.format is 'auto', since it compresses better than PNG for photos.
+     * @param {string} originalType - The source file's MIME type.
+     * @returns {string} Output MIME type.
+     */
     selectOptimalFormat(originalType) {
         if (this.options.format !== 'auto') {
             return this.options.format;
         }
 
-        // Ưu tiên JPEG cho nén tốt hơn
+        // Prefer JPEG for better compression
         if (originalType === 'image/png') {
             return 'image/jpeg';
         }
@@ -117,15 +151,23 @@ class MagicImageCompressor {
         return 'image/jpeg';
     }
 
+    /**
+     * Estimate output dimensions by scaling down proportionally to the target/current size ratio.
+     * Leaves dimensions untouched if the file is already close to the target size.
+     * @param {number} width - Original width.
+     * @param {number} height - Original height.
+     * @param {number} currentSizeKB - Original file size in KB.
+     * @returns {{width: number, height: number}}
+     */
     calculateOptimalDimensions(width, height, currentSizeKB) {
         const targetSizeKB = this.options.targetSizeKB;
         
-        // Nếu gần target, giữ nguyên
+        // If close to target, keep as is
         if (currentSizeKB <= targetSizeKB * 1.3) {
             return { width, height };
         }
 
-        // Tính toán scale factor
+        // Calculate scale factor
         const scaleFactor = Math.sqrt(targetSizeKB / currentSizeKB) * 0.9;
         let newWidth = Math.floor(width * scaleFactor);
         let newHeight = Math.floor(height * scaleFactor);
@@ -145,6 +187,15 @@ class MagicImageCompressor {
         return { width: newWidth, height: newHeight };
     }
 
+    /**
+     * Binary-search the JPEG/WebP quality parameter to hit options.targetSizeKB
+     * within a 10% tolerance, at a fixed output size.
+     * @param {HTMLImageElement} img
+     * @param {number} width - Output width.
+     * @param {number} height - Output height.
+     * @param {string} format - Output MIME type.
+     * @returns {Promise<{blob: Blob, quality: number, dimensions: {width: number, height: number}}>}
+     */
     async compressWithBinarySearch(img, width, height, format) {
         let minQuality = this.options.minQuality;
         let maxQuality = this.options.maxQuality;
@@ -190,6 +241,14 @@ class MagicImageCompressor {
         };
     }
 
+    /**
+     * Fallback used when quality-only compression can't reach the target size:
+     * progressively downscale the image (90% -> 30% of original) and re-run
+     * the quality binary search at each step until the target is met.
+     * @param {HTMLImageElement} img
+     * @param {string} format - Output MIME type.
+     * @returns {Promise<{blob: Blob, quality: number, dimensions: {width: number, height: number}}>}
+     */
     async advancedCompress(img, format) {
         const targetSize = this.options.targetSizeKB * 1024;
         let currentWidth = img.width;
@@ -217,7 +276,7 @@ class MagicImageCompressor {
             }
         }
 
-        // Fallback cuối cùng
+        // Final fallback
         const minWidth = Math.max(150, currentWidth);
         const minHeight = Math.max(150, currentHeight);
         
@@ -228,6 +287,16 @@ class MagicImageCompressor {
         };
     }
 
+    /**
+     * Draw an image onto a canvas at the given size and encode it to a blob.
+     * Fills a white background first when encoding to JPEG (which has no alpha channel).
+     * @param {HTMLImageElement} img
+     * @param {number} width
+     * @param {number} height
+     * @param {string} format - Output MIME type.
+     * @param {number} quality - Encoder quality, 0-1 (ignored for lossless formats like PNG).
+     * @returns {Promise<Blob>}
+     */
     createBlob(img, width, height, format, quality) {
         return new Promise((resolve, reject) => {
             const canvas = document.createElement('canvas');
@@ -264,6 +333,12 @@ class MagicImageCompressor {
         });
     }
 
+    /**
+     * Compress a batch of files sequentially, collecting per-file success/error results.
+     * @param {File[]} files
+     * @param {(percent: number, current: number, total: number) => void} [onProgress] - Called after each file.
+     * @returns {Promise<object[]>} One result per file (either {success:true,...compress() result} or {success:false, error}).
+     */
     async compressMultiple(files, onProgress) {
         const results = [];
         

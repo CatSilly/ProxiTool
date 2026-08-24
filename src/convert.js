@@ -92,6 +92,12 @@ fileManager.onChange((files) => {
     updateFileList(files);
 });
 
+/**
+ * Switch the active converter tab (image / audio / magic / spritesheet):
+ * updates the active button, shows the matching settings panel, sets the
+ * file input's accept filter, and clears any previously selected files.
+ * @param {'image'|'audio'|'magic'|'spritesheet'} mode
+ */
 function switchMode(mode) {
     currentMode = mode;
     
@@ -132,7 +138,7 @@ function switchMode(mode) {
     fileManager.clearAll();
 }
 
-// Thêm hàm toggle
+// Toggle helper for custom grid input
 function toggleCustomGrid() {
     if (spritesheetLayout.value === 'custom') {
         UIHelper.show(customGrid);
@@ -141,6 +147,7 @@ function toggleCustomGrid() {
     }
 }
 
+/** Show/hide the custom color picker based on the spritesheet background dropdown. */
 function toggleCustomColor() {
     if (spriteBackground.value === 'custom') {
         UIHelper.show(customColor);
@@ -149,6 +156,7 @@ function toggleCustomColor() {
     }
 }
 
+/** Show/hide the custom width/height inputs based on the resize dropdown. */
 function toggleCustomSize() {
     if (resizeOption.value === 'custom') {
         UIHelper.show(customSize);
@@ -157,6 +165,11 @@ function toggleCustomSize() {
     }
 }
 
+/**
+ * Re-render the "files to convert" list from the current FileManager state.
+ * Toggles the empty state, clear-all button, and convert section as needed.
+ * @param {object[]} files - Current file records from FileManager.
+ */
 function updateFileList(files) {
     UIHelper.setText(fileCount, files.length);
     
@@ -200,10 +213,17 @@ function updateFileList(files) {
     }
 }
 
+/** Remove a single file from FileManager by id (called from the remove button's onclick). */
 function removeFile(id) {
     fileManager.removeFile(id);
 }
 
+/**
+ * Convert every selected file according to the active mode (image / magic / audio),
+ * or delegate to handleSpritesheetConvert() when mode is 'spritesheet'.
+ * Reads settings straight from the form controls, builds the result blobs,
+ * and populates convertedFiles for showConvertedFiles() to render.
+ */
 async function handleConvert() {
     const files = fileManager.getAll();
     if (files.length === 0) return;
@@ -305,6 +325,11 @@ async function handleConvert() {
     }
 }
 
+/**
+ * Generate a spritesheet from the selected images, show a preview, and add the
+ * resulting PNG (plus an optional JSON metadata file) to convertedFiles.
+ * @param {object[]} files - Selected file records from FileManager.
+ */
 async function handleSpritesheetConvert(files) {
     UIHelper.showLoading(convertBtn, 'Generating spritesheet...');
     
@@ -344,7 +369,7 @@ async function handleSpritesheetConvert(files) {
             info: result.info
         }];
         
-        // Export metadata nếu được chọn
+        // Export metadata if the option is checked
         if (document.getElementById('exportMetadata').checked) {
             const metadataBlob = spritesheetGenerator.exportMetadata(
                 result.preview.images.map((img, i) => ({
@@ -377,6 +402,10 @@ async function handleSpritesheetConvert(files) {
     }
 }
 
+/**
+ * Render the generated spritesheet canvas and its stats into the preview panel.
+ * @param {object} result - Output of SpritesheetGenerator.generate() (canvas, info, preview.grid).
+ */
 function showSpritesheetPreview(result) {
     const previewCanvas = document.getElementById('previewCanvas');
     const previewInfo = document.getElementById('previewInfo');
@@ -423,6 +452,13 @@ function showSpritesheetPreview(result) {
     UIHelper.show(spritesheetPreview);
 }
 
+/**
+ * Resize (if requested) and re-encode an image file to the target format.
+ * @param {File} file - Source image file.
+ * @param {string} targetFormat - Output format, e.g. 'jpg', 'png', 'webp'.
+ * @param {string} targetSize - 'original', 'custom' (reads #customWidth/#customHeight), or 'WxH'.
+ * @returns {Promise<Blob>}
+ */
 async function convertImage(file, targetFormat, targetSize) {
     const img = await ImageHelper.loadImage(file);
     
@@ -447,6 +483,10 @@ async function convertImage(file, targetFormat, targetSize) {
     return await ImageHelper.canvasToBlob(canvas, mimeType, 0.95);
 }
 
+/**
+ * Render the "converted files" list, including a mode-specific info line
+ * (compression stats, spritesheet grid info, or audio format details).
+ */
 function showConvertedFiles() {
     UIHelper.setText(convertedCount, convertedFiles.length);
     
@@ -500,6 +540,7 @@ function showConvertedFiles() {
     UIHelper.show(convertedSection);
 }
 
+/** Download a single converted file by id (called from the download button's onclick). */
 function downloadFile(id) {
     const file = convertedFiles.find(f => f.id === id);
     if (file) {
@@ -507,11 +548,13 @@ function downloadFile(id) {
     }
 }
 
+/** Download every converted file, staggered so the browser doesn't block them. */
 function downloadAllFiles() {
     DownloadHelper.downloadMultiple(convertedFiles);
     NotificationHelper.success('Downloading all files...');
 }
 
+/** Clear selected files, converted results, and revoke their object URLs. */
 function reset() {
     convertedFiles.forEach(f => URL.revokeObjectURL(f.url));
     fileManager.clearAll();
