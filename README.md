@@ -57,7 +57,7 @@ MP3, WAV and more.
 > Spritesheet Generator
 
 ## Open source
-ProxiTool is free and open source. Contributions, bug reports, and feature requests are welcome.
+ProxiTool is free and open source. However, since there are many similar alternative tools available online, and the original purpose of the project was solely for my personal use and that of my friends, we are no longer accepting PR or issues from external parties. 
 
 ## License
 
